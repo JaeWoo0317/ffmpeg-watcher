@@ -65,7 +65,7 @@
 ```
 📂 ryu_ws/
 ├── 📂 ffmpeg-watcher/   ← 이 프로그램
-└── 📂 videomaker/       ← 이것도 필요해요!
+└── 📂 ffmpeg-videomaker/ ← 이것도 필요해요!
 ```
 
 👉 videomaker: [https://github.com/JaeWoo0317/ffmpeg-videomaker](https://github.com/JaeWoo0317/ffmpeg-videomaker)

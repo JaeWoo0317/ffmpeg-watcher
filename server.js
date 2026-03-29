@@ -6,11 +6,11 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
-const { convertVideo, checkGpuSupport } = require('../videomaker/server/ffmpeg.js');
+const { convertVideo, checkGpuSupport } = require('../ffmpeg-videomaker/server/ffmpeg.js');
 
 const CONFIG_FILE = path.join(__dirname, 'watcher.config.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const VIDEOMAKER_ASSET_DIR = path.join(__dirname, '../videomaker/server/assets');
+const VIDEOMAKER_ASSET_DIR = path.join(__dirname, '../ffmpeg-videomaker/server/assets');
 const PORT = 4001;
 
 const VIDEO_EXTS = new Set(['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.ts']);

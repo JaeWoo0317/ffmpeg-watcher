@@ -92,7 +92,7 @@ git clone https://github.com/JaeWoo0317/ffmpeg-watcher.git
 > ```
 > 📂 ryu_ws/
 > ├── 📂 ffmpeg-watcher/   ← 이 프로그램
-> └── 📂 videomaker/       ← 이것도 필요해요!
+> └── 📂 ffmpeg-videomaker/ ← 이것도 필요해요!
 > ```
 > videomaker를 먼저 다운로드하세요: [https://github.com/JaeWoo0317/ffmpeg-videomaker](https://github.com/JaeWoo0317/ffmpeg-videomaker)
 
