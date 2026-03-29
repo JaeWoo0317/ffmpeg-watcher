@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>FFmpeg Watcher</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 32px 24px;
+      max-width: 780px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #22c55e; display: inline-block; }
+    .dot.off { background: #555; }
+
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .tab {
+      padding: 12px 18px;
+      font-size: 13px;
+      color: #777;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s;
+      white-space: nowrap;
+    }
+    .tab:hover { color: #ccc; }
+    .tab.active { color: #fff; border-bottom-color: #fff; }
+
+    .tab-content { display: none; padding: 20px; }
+    .tab-content.active { display: block; }
+
+    .form-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .form-row:last-child { margin-bottom: 0; }
+
+    .form-row label:first-child {
+      min-width: 120px;
+      font-size: 13px;
+      color: #aaa;
+      flex-shrink: 0;
+    }
+
+    input[type="text"], input[type="number"], select {
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 6px;
+      color: #e0e0e0;
+      font-size: 13px;
+      padding: 7px 10px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input[type="text"]:focus, input[type="number"]:focus, select:focus { border-color: #555; }
+    input[type="text"] { flex: 1; min-width: 0; }
+    select { flex: 1; min-width: 0; }
+    input[type="number"] { width: 90px; flex: none; }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      flex: 1;
+      height: 4px;
+      background: #333;
+      border-radius: 2px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: #fff;
+      cursor: pointer;
+    }
+    .range-value {
+      min-width: 36px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .range-hint { font-size: 11px; color: #555; }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      color: #ccc;
+      cursor: pointer;
+    }
+    input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: #fff; }
+
+    .hint { font-size: 11px; color: #555; flex-basis: 100%; padding-left: 130px; margin-top: -8px; margin-bottom: 6px; }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin: 20px 0 12px;
+    }
+    .section-title:first-child { margin-top: 0; }
+
+    .save-btn {
+      width: 100%;
+      padding: 13px;
+      background: #fff;
+      color: #000;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      margin-bottom: 20px;
+    }
+    .save-btn:hover { background: #ddd; }
+    .save-btn:active { transform: scale(0.98); }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #22c55e;
+      color: #000;
+      font-weight: 600;
+      font-size: 14px;
+      padding: 10px 24px;
+      border-radius: 999px;
+      transition: transform 0.3s ease;
+      pointer-events: none;
+      z-index: 100;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast.error { background: #ef4444; color: #fff; }
+
+    .log-box {
+      background: #0a0a0a;
+      border: 1px solid #222;
+      border-radius: 8px;
+      padding: 14px;
+      height: 200px;
+      overflow-y: auto;
+      font-family: 'Consolas', 'Menlo', monospace;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+    .log-line { white-space: pre-wrap; word-break: break-all; }
+    .log-line.success { color: #22c55e; }
+    .log-line.error { color: #ef4444; }
+    .log-line.info { color: #aaa; }
+
+    .progress-wrap { display: none; margin-bottom: 12px; }
+    .progress-wrap.active { display: block; }
+    .progress-label { font-size: 12px; color: #888; margin-bottom: 6px; display: flex; justify-content: space-between; }
+    .progress-bar { height: 5px; background: #222; border-radius: 3px; overflow: hidden; }
+    .progress-fill { height: 100%; background: #fff; border-radius: 3px; transition: width 0.3s ease; width: 0%; }
+
+    .gpu-badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      margin-left: 6px;
+      background: #1e3a1e;
+      color: #22c55e;
+    }
+    .gpu-badge.none { background: #2a2a2a; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>
+    <span class="dot off" id="statusDot"></span>
+    FFmpeg Watcher
+    <span id="gpuBadge" class="gpu-badge none">GPU 감지 중...</span>
+  </h1>
+
+  <div class="card">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('path')">경로</div>
+      <div class="tab" onclick="switchTab('video')">영상</div>
+      <div class="tab" onclick="switchTab('audio')">오디오</div>
+      <div class="tab" onclick="switchTab('filter')">트림 / 크롭</div>
+      <div class="tab" onclick="switchTab('asset')">자막 / 워터마크</div>
+    </div>
+
+    <!-- 경로 탭 -->
+    <div id="tab-path" class="tab-content active">
+      <div class="form-row">
+        <label>감시 폴더</label>
+        <input type="text" id="watchFolder" placeholder="C:/Users/.../input" />
+      </div>
+      <p class="hint">이 폴더에 영상 파일을 넣으면 자동으로 변환됩니다.</p>
+      <div class="form-row">
+        <label>출력 폴더</label>
+        <input type="text" id="outputFolder" placeholder="C:/Users/.../output" />
+      </div>
+      <p class="hint">변환된 파일이 저장될 폴더입니다.</p>
+    </div>
+
+    <!-- 영상 탭 -->
+    <div id="tab-video" class="tab-content">
+      <p class="section-title">코덱 / 포맷</p>
+      <div class="form-row">
+        <label>코덱</label>
+        <select id="codec" onchange="onCodecChange()">
+          <option value="h264">H.264 (AVC)</option>
+          <option value="h265">H.265 (HEVC)</option>
+          <option value="av1">AV1 (SVT-AV1)</option>
+          <option value="vp9">VP9</option>
+          <option value="mpeg4">MPEG-4</option>
+          <option value="prores">ProRes (편집용)</option>
+          <option value="copy">복사 (재인코딩 없음)</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>컨테이너</label>
+        <select id="container">
+          <option value="mp4">MP4</option>
+          <option value="mkv">MKV</option>
+          <option value="webm">WebM</option>
+          <option value="mov">MOV</option>
+          <option value="avi">AVI</option>
+        </select>
+      </div>
+      <div class="form-row" id="row-profile">
+        <label>프로파일</label>
+        <select id="profile">
+          <option value="baseline">Baseline (호환성 높음)</option>
+          <option value="main">Main</option>
+          <option value="high">High (고품질)</option>
+          <option value="high10">High 10 (10bit)</option>
+        </select>
+      </div>
+
+      <p class="section-title">해상도 / FPS</p>
+      <div class="form-row">
+        <label>해상도</label>
+        <select id="resolution" onchange="onResolutionChange()">
+          <option value="original">원본 유지</option>
+          <option value="4k">4K (3840×2160)</option>
+          <option value="1080p">1080p (1920×1080)</option>
+          <option value="720p">720p (1280×720)</option>
+          <option value="480p">480p (854×480)</option>
+          <option value="custom">사용자 정의</option>
+        </select>
+      </div>
+      <div class="form-row" id="row-custom-res" style="display:none">
+        <label>사용자 정의</label>
+        <input type="number" id="customWidth" placeholder="가로" style="width:80px" />
+        <span style="color:#666">x</span>
+        <input type="number" id="customHeight" placeholder="세로" style="width:80px" />
+        <label class="checkbox-label">
+          <input type="checkbox" id="keepAspectRatio" checked /> 종횡비 유지
+        </label>
+      </div>
+      <div class="form-row">
+        <label>리사이즈 필터</label>
+        <select id="scaleFilter">
+          <option value="bilinear">Bilinear (기본, 빠름)</option>
+          <option value="bicubic">Bicubic (균형)</option>
+          <option value="lanczos">Lanczos (고품질, 느림)</option>
+          <option value="neighbor">Nearest Neighbor (픽셀아트)</option>
+          <option value="spline">Spline</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>FPS</label>
+        <select id="fps">
+          <option value="">원본 유지</option>
+          <option value="24">24 fps (영화)</option>
+          <option value="25">25 fps (PAL)</option>
+          <option value="30">30 fps</option>
+          <option value="50">50 fps</option>
+          <option value="60">60 fps</option>
+        </select>
+      </div>
+
+      <p class="section-title">비트레이트 / 품질</p>
+      <div class="form-row">
+        <label>비트레이트 모드</label>
+        <select id="bitrateMode" onchange="onBitrateModeChange()">
+          <option value="crf">CRF (품질 우선)</option>
+          <option value="cbr">CBR (고정 비트레이트)</option>
+          <option value="vbr">VBR (가변 비트레이트)</option>
+        </select>
+      </div>
+      <div class="form-row" id="row-crf">
+        <label>CRF 값</label>
+        <input type="range" id="crf" min="0" max="51" value="23"
+          oninput="document.getElementById('crfVal').textContent=this.value; document.getElementById('crfHint').textContent=crfHint(this.value)" />
+        <span class="range-value" id="crfVal">23</span>
+        <span class="range-hint" id="crfHint">(보통)</span>
+      </div>
+      <div class="form-row" id="row-vbitrate" style="display:none">
+        <label>영상 비트레이트</label>
+        <input type="number" id="videoBitrate" value="5000" min="100" max="50000" />
+        <span style="font-size:13px;color:#888">kbps</span>
+      </div>
+      <div class="form-row">
+        <label>인코딩 속도</label>
+        <select id="preset">
+          <option value="ultrafast">ultrafast (빠름, 큰 파일)</option>
+          <option value="fast">fast</option>
+          <option value="medium">medium (균형)</option>
+          <option value="slow">slow</option>
+          <option value="veryslow">veryslow (느림, 작은 파일)</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>파일 크기 제한</label>
+        <input type="number" id="maxFileSizeMB" placeholder="제한 없음" min="1" />
+        <span style="font-size:13px;color:#888">MB (비워두면 제한 없음)</span>
+      </div>
+
+      <p class="section-title">GPU / 고급</p>
+      <div class="form-row">
+        <label>GPU 가속</label>
+        <select id="gpuAccel">
+          <option value="auto">자동 감지</option>
+          <option value="cpu">CPU만 사용</option>
+          <option value="nvenc" id="opt-nvenc" style="display:none">NVIDIA NVENC</option>
+          <option value="qsv" id="opt-qsv" style="display:none">Intel QSV</option>
+          <option value="amf" id="opt-amf" style="display:none">AMD AMF</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="checkbox-label">
+          <input type="checkbox" id="parallelEncode" onchange="onParallelChange()" /> 세그먼트 병렬 인코딩
+        </label>
+      </div>
+      <div class="form-row" id="row-parallel-segs" style="display:none">
+        <label>병렬 세그먼트 수</label>
+        <input type="number" id="parallelSegments" placeholder="자동" min="2" max="32" />
+        <span style="font-size:12px;color:#888">비워두면 코어 수 자동 사용</span>
+      </div>
+      <div class="form-row">
+        <label class="checkbox-label">
+          <input type="checkbox" id="deinterlace" /> 디인터레이스 (yadif)
+        </label>
+      </div>
+      <div class="form-row">
+        <label class="checkbox-label">
+          <input type="checkbox" id="noiseReduction" onchange="onNoiseChange()" /> 노이즈 제거
+        </label>
+      </div>
+      <div class="form-row" id="row-noise-str" style="display:none">
+        <label>노이즈 강도</label>
+        <input type="range" id="noiseStrength" min="1" max="10" value="5"
+          oninput="document.getElementById('noiseVal').textContent=this.value; document.getElementById('noiseHint').textContent=noiseHint(this.value)" />
+        <span class="range-value" id="noiseVal">5</span>
+        <span class="range-hint" id="noiseHint">(보통)</span>
+      </div>
+    </div>
+
+    <!-- 오디오 탭 -->
+    <div id="tab-audio" class="tab-content">
+      <div class="form-row">
+        <label>오디오 코덱</label>
+        <select id="audioCodec" onchange="onAudioCodecChange()">
+          <option value="aac">AAC (권장)</option>
+          <option value="mp3">MP3</option>
+          <option value="opus">Opus</option>
+          <option value="flac">FLAC (무손실)</option>
+          <option value="ac3">AC3 (돌비)</option>
+          <option value="pcm">PCM (무압축)</option>
+          <option value="copy">복사 (재인코딩 없음)</option>
+        </select>
+      </div>
+      <div class="form-row" id="row-audio-bitrate">
+        <label>오디오 비트레이트</label>
+        <select id="audioBitrate">
+          <option value="64">64 kbps (저품질)</option>
+          <option value="128">128 kbps</option>
+          <option value="192">192 kbps (권장)</option>
+          <option value="256">256 kbps</option>
+          <option value="320">320 kbps (고품질)</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>채널</label>
+        <select id="audioChannels">
+          <option value="mono">모노 (1ch)</option>
+          <option value="stereo">스테레오 (2ch)</option>
+          <option value="5.1">5.1 서라운드 (6ch)</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>샘플레이트</label>
+        <select id="audioSampleRate">
+          <option value="22050">22050 Hz</option>
+          <option value="44100">44100 Hz (CD 품질)</option>
+          <option value="48000">48000 Hz (권장)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 트림 / 크롭 탭 -->
+    <div id="tab-filter" class="tab-content">
+      <p class="section-title">구간 자르기 (트림)</p>
+      <div class="form-row">
+        <label>시작 시간</label>
+        <input type="text" id="trimStart" placeholder="00:00:00" style="flex:none;width:120px" />
+        <label style="min-width:auto;margin-left:10px">끝 시간</label>
+        <input type="text" id="trimEnd" placeholder="00:00:00" style="flex:none;width:120px" />
+      </div>
+      <p class="hint">비워두면 전체 영상을 변환합니다. 형식: HH:MM:SS</p>
+
+      <p class="section-title">크롭 (영역 자르기)</p>
+      <div class="form-row">
+        <label class="checkbox-label">
+          <input type="checkbox" id="cropEnabled" onchange="onCropChange()" /> 크롭 활성화
+        </label>
+      </div>
+      <div id="crop-fields" style="display:none">
+        <div class="form-row">
+          <label>크기 (픽셀)</label>
+          <input type="number" id="cropWidth" placeholder="가로" style="width:80px" />
+          <span style="color:#666">x</span>
+          <input type="number" id="cropHeight" placeholder="세로" style="width:80px" />
+        </div>
+        <div class="form-row">
+          <label>시작 위치</label>
+          <span style="font-size:13px;color:#888">X:</span>
+          <input type="number" id="cropX" placeholder="0" style="width:70px" />
+          <span style="font-size:13px;color:#888;margin-left:6px">Y:</span>
+          <input type="number" id="cropY" placeholder="0" style="width:70px" />
+        </div>
+        <p class="hint">좌측 상단 기준 좌표 (픽셀 단위)</p>
+      </div>
+    </div>
+
+    <!-- 자막 / 워터마크 탭 -->
+    <div id="tab-asset" class="tab-content">
+      <p class="section-title">자막</p>
+      <div class="form-row">
+        <label>자막 파일 경로</label>
+        <input type="text" id="subtitleLocalPath" placeholder="C:/path/to/subtitle.srt (.srt, .ass, .ssa)" />
+      </div>
+      <div class="form-row" id="row-sub-size">
+        <label>폰트 크기</label>
+        <input type="number" id="subtitleFontSize" value="24" min="10" max="72" />
+      </div>
+      <div class="form-row" id="row-sub-pos">
+        <label>위치</label>
+        <select id="subtitlePosition">
+          <option value="bottom">하단 (기본)</option>
+          <option value="top">상단</option>
+          <option value="center">중앙</option>
+        </select>
+      </div>
+
+      <p class="section-title">워터마크 / 로고</p>
+      <div class="form-row">
+        <label>이미지 파일 경로</label>
+        <input type="text" id="watermarkLocalPath" placeholder="C:/path/to/logo.png (PNG, JPG)" />
+      </div>
+      <div class="form-row" id="row-wm-pos">
+        <label>위치</label>
+        <select id="watermarkPosition">
+          <option value="top-left">좌측 상단</option>
+          <option value="top-right">우측 상단</option>
+          <option value="bottom-left">좌측 하단</option>
+          <option value="bottom-right">우측 하단 (기본)</option>
+          <option value="center">중앙</option>
+        </select>
+      </div>
+      <div class="form-row" id="row-wm-opacity">
+        <label>투명도</label>
+        <input type="range" id="watermarkOpacity" min="0" max="1" step="0.05" value="0.7"
+          oninput="document.getElementById('wmOpacityVal').textContent=Math.round(this.value*100)+'%'" />
+        <span class="range-value" id="wmOpacityVal">70%</span>
+      </div>
+    </div>
+  </div>
+
+  <button class="save-btn" onclick="saveConfig()">설정 저장</button>
+
+  <div class="card">
+    <div style="padding:16px 20px 0">
+      <div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px">실시간 로그</div>
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-label">
+          <span id="progressFile"></span>
+          <span id="progressPct"></span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      </div>
+    </div>
+    <div style="padding:0 8px 8px">
+      <div class="log-box" id="logBox"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    socket.on('connect', () => document.getElementById('statusDot').classList.remove('off'));
+    socket.on('disconnect', () => document.getElementById('statusDot').classList.add('off'));
+
+    // --- Tabs ---
+    function switchTab(name) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      event.currentTarget.classList.add('active');
+      document.getElementById('tab-' + name).classList.add('active');
+    }
+
+    // --- GPU info ---
+    fetch('/api/gpu-info').then(r => r.json()).then(gpu => {
+      const badge = document.getElementById('gpuBadge');
+      if (gpu && gpu.available) {
+        badge.textContent = gpu.recommended;
+        badge.classList.remove('none');
+        if (gpu.nvenc) document.getElementById('opt-nvenc').style.display = '';
+        if (gpu.qsv) document.getElementById('opt-qsv').style.display = '';
+        if (gpu.amf) document.getElementById('opt-amf').style.display = '';
+      } else {
+        badge.textContent = 'GPU 없음 (CPU)';
+      }
+    }).catch(() => {});
+
+    // --- Load config ---
+    fetch('/api/config').then(r => r.json()).then(cfg => {
+      set('watchFolder', cfg.watchFolder || '');
+      set('outputFolder', cfg.outputFolder || '');
+      const s = cfg.settings || {};
+      setVal('codec', s.codec); onCodecChange();
+      setVal('container', s.container);
+      setVal('profile', s.profile);
+      setVal('scaleFilter', s.scaleFilter);
+      setVal('resolution', s.resolution); onResolutionChange();
+      setNum('customWidth', s.customWidth);
+      setNum('customHeight', s.customHeight);
+      setCheck('keepAspectRatio', s.keepAspectRatio !== false);
+      setVal('fps', s.fps);
+      setVal('bitrateMode', s.bitrateMode || 'crf'); onBitrateModeChange();
+      const crf = s.crf ?? 23;
+      document.getElementById('crf').value = crf;
+      document.getElementById('crfVal').textContent = crf;
+      document.getElementById('crfHint').textContent = crfHint(crf);
+      setNum('videoBitrate', s.videoBitrate || 5000);
+      setVal('preset', s.preset);
+      setNum('maxFileSizeMB', s.maxFileSizeMB || '');
+      setVal('gpuAccel', s.gpuAccel || 'auto');
+      setCheck('parallelEncode', !!s.parallelEncode); onParallelChange();
+      setNum('parallelSegments', s.parallelSegments || '');
+      setCheck('deinterlace', !!s.deinterlace);
+      setCheck('noiseReduction', !!s.noiseReduction); onNoiseChange();
+      const ns = s.noiseStrength ?? 5;
+      document.getElementById('noiseStrength').value = ns;
+      document.getElementById('noiseVal').textContent = ns;
+      document.getElementById('noiseHint').textContent = noiseHint(ns);
+      setVal('audioCodec', s.audioCodec); onAudioCodecChange();
+      setVal('audioBitrate', String(s.audioBitrate || 192));
+      setVal('audioChannels', s.audioChannels);
+      setVal('audioSampleRate', String(s.audioSampleRate || 48000));
+      set('trimStart', s.trimStart || '');
+      set('trimEnd', s.trimEnd || '');
+      setCheck('cropEnabled', !!s.cropEnabled); onCropChange();
+      setNum('cropWidth', s.cropWidth || '');
+      setNum('cropHeight', s.cropHeight || '');
+      setNum('cropX', s.cropX || '');
+      setNum('cropY', s.cropY || '');
+      set('subtitleLocalPath', s.subtitleLocalPath || '');
+      setNum('subtitleFontSize', s.subtitleFontSize || 24);
+      setVal('subtitlePosition', s.subtitlePosition);
+      set('watermarkLocalPath', s.watermarkLocalPath || '');
+      setVal('watermarkPosition', s.watermarkPosition);
+      const wop = s.watermarkOpacity ?? 0.7;
+      document.getElementById('watermarkOpacity').value = wop;
+      document.getElementById('wmOpacityVal').textContent = Math.round(wop * 100) + '%';
+    });
+
+    function set(id, val) { document.getElementById(id).value = val ?? ''; }
+    function setNum(id, val) { document.getElementById(id).value = (val !== '' && val != null) ? val : ''; }
+    function setVal(id, val) {
+      if (!val && val !== 0) return;
+      const el = document.getElementById(id);
+      for (const opt of el.options) { if (opt.value === String(val)) { el.value = String(val); break; } }
+    }
+    function setCheck(id, val) { document.getElementById(id).checked = !!val; }
+
+    // --- Conditional UI ---
+    function onCodecChange() {
+      const c = document.getElementById('codec').value;
+      const show = c === 'h264' || c === 'h265';
+      document.getElementById('row-profile').style.display = show ? '' : 'none';
+      if (c === 'h265') {
+        const h10 = document.querySelector('#profile option[value="high10"]');
+        if (h10) h10.style.display = 'none';
+      } else {
+        const h10 = document.querySelector('#profile option[value="high10"]');
+        if (h10) h10.style.display = '';
+      }
+    }
+    function onResolutionChange() {
+      const v = document.getElementById('resolution').value;
+      document.getElementById('row-custom-res').style.display = v === 'custom' ? '' : 'none';
+    }
+    function onBitrateModeChange() {
+      const v = document.getElementById('bitrateMode').value;
+      document.getElementById('row-crf').style.display = v === 'crf' ? '' : 'none';
+      document.getElementById('row-vbitrate').style.display = v !== 'crf' ? '' : 'none';
+    }
+    function onParallelChange() {
+      document.getElementById('row-parallel-segs').style.display =
+        document.getElementById('parallelEncode').checked ? '' : 'none';
+    }
+    function onNoiseChange() {
+      document.getElementById('row-noise-str').style.display =
+        document.getElementById('noiseReduction').checked ? '' : 'none';
+    }
+    function onAudioCodecChange() {
+      const v = document.getElementById('audioCodec').value;
+      document.getElementById('row-audio-bitrate').style.display =
+        (v === 'copy' || v === 'flac' || v === 'pcm') ? 'none' : '';
+    }
+    function onCropChange() {
+      document.getElementById('crop-fields').style.display =
+        document.getElementById('cropEnabled').checked ? '' : 'none';
+    }
+
+    function crfHint(v) {
+      return v <= 18 ? '(고품질)' : v <= 28 ? '(보통)' : '(저품질)';
+    }
+    function noiseHint(v) {
+      return v <= 3 ? '(약함)' : v <= 7 ? '(보통)' : '(강함)';
+    }
+
+    // --- Save ---
+    function saveConfig() {
+      const config = {
+        watchFolder: document.getElementById('watchFolder').value.trim(),
+        outputFolder: document.getElementById('outputFolder').value.trim(),
+        settings: {
+          codec: document.getElementById('codec').value,
+          container: document.getElementById('container').value,
+          profile: document.getElementById('profile').value,
+          scaleFilter: document.getElementById('scaleFilter').value,
+          resolution: document.getElementById('resolution').value,
+          customWidth: document.getElementById('customWidth').value,
+          customHeight: document.getElementById('customHeight').value,
+          keepAspectRatio: document.getElementById('keepAspectRatio').checked,
+          fps: document.getElementById('fps').value,
+          bitrateMode: document.getElementById('bitrateMode').value,
+          crf: parseInt(document.getElementById('crf').value, 10),
+          videoBitrate: parseInt(document.getElementById('videoBitrate').value, 10) || 5000,
+          preset: document.getElementById('preset').value,
+          maxFileSizeMB: document.getElementById('maxFileSizeMB').value ? parseInt(document.getElementById('maxFileSizeMB').value, 10) : '',
+          gpuAccel: document.getElementById('gpuAccel').value,
+          gpuEncoder: '',
+          parallelEncode: document.getElementById('parallelEncode').checked,
+          parallelSegments: document.getElementById('parallelSegments').value ? parseInt(document.getElementById('parallelSegments').value, 10) : '',
+          deinterlace: document.getElementById('deinterlace').checked,
+          noiseReduction: document.getElementById('noiseReduction').checked,
+          noiseStrength: parseInt(document.getElementById('noiseStrength').value, 10),
+          audioCodec: document.getElementById('audioCodec').value,
+          audioBitrate: parseInt(document.getElementById('audioBitrate').value, 10),
+          audioChannels: document.getElementById('audioChannels').value,
+          audioSampleRate: parseInt(document.getElementById('audioSampleRate').value, 10),
+          trimStart: document.getElementById('trimStart').value.trim(),
+          trimEnd: document.getElementById('trimEnd').value.trim(),
+          cropEnabled: document.getElementById('cropEnabled').checked,
+          cropWidth: document.getElementById('cropWidth').value,
+          cropHeight: document.getElementById('cropHeight').value,
+          cropX: document.getElementById('cropX').value,
+          cropY: document.getElementById('cropY').value,
+          subtitleLocalPath: document.getElementById('subtitleLocalPath').value.trim(),
+          subtitleFontSize: parseInt(document.getElementById('subtitleFontSize').value, 10) || 24,
+          subtitlePosition: document.getElementById('subtitlePosition').value,
+          watermarkLocalPath: document.getElementById('watermarkLocalPath').value.trim(),
+          watermarkPosition: document.getElementById('watermarkPosition').value,
+          watermarkOpacity: parseFloat(document.getElementById('watermarkOpacity').value),
+        },
+      };
+      fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      })
+        .then(r => r.json())
+        .then(() => showToast('설정이 저장됐습니다.'))
+        .catch(() => showToast('저장 실패', true));
+    }
+
+    // --- Logs ---
+    const logBox = document.getElementById('logBox');
+    function appendLog(msg, type) {
+      const line = document.createElement('div');
+      line.className = 'log-line ' + (type || 'info');
+      line.textContent = msg;
+      logBox.appendChild(line);
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+    socket.on('log', ({ msg, type }) => appendLog(msg, type));
+    socket.on('progress', ({ file, progress }) => {
+      document.getElementById('progressWrap').classList.add('active');
+      document.getElementById('progressFile').textContent = file;
+      document.getElementById('progressPct').textContent = progress + '%';
+      document.getElementById('progressFill').style.width = progress + '%';
+    });
+    socket.on('done', () => {
+      document.getElementById('progressWrap').classList.remove('active');
+      document.getElementById('progressFill').style.width = '0%';
+    });
+    socket.on('error', () => {
+      document.getElementById('progressWrap').classList.remove('active');
+      document.getElementById('progressFill').style.width = '0%';
+    });
+
+    // --- Toast ---
+    function showToast(msg, isError = false) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast' + (isError ? ' error' : '');
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2500);
+    }
+  </script>
+</body>
+</html>
